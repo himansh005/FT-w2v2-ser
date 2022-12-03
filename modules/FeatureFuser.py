@@ -8,6 +8,8 @@ from transformers import Wav2Vec2ForPreTraining, Wav2Vec2Config
 import argparse
 from transformers.models.wav2vec2.modeling_wav2vec2 import _compute_mask_indices
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class Wav2vecWrapper(nn.Module):
     def __init__(self, modelpath):
         super().__init__()
@@ -36,25 +38,25 @@ class Wav2vecWrapper(nn.Module):
             if self.training:
                 # apply SpecAugment along time axis
                 batch_size, sequence_length, hidden_size = wav2vec_z.size()
-                mask_time_indices = _compute_mask_indices(
+                mask_time_indices = torch.Tensor(_compute_mask_indices(
                     (batch_size, sequence_length),
                     self.mask_time_prob,
                     self.mask_time_length,
                     min_masks=2,
-                    device=x.device
-                )
-                masked_indicies = mask_time_indices
+                    #device=x.device
+                )).to(x.device)
+                masked_indicies = torch.Tensor(mask_time_indices).long()
                 flip_mask = torch.rand((batch_size, sequence_length), device=masked_indicies.device) > self.observe_time_prob
                 wav2vec_z[masked_indicies & flip_mask] = 0.
 
                 # apply SpecAugment along feature axis
-                mask_feature_indices = _compute_mask_indices(
+                mask_feature_indices = torch.Tensor(_compute_mask_indices(
                     (batch_size, hidden_size),
                     self.mask_feature_prob,
                     self.mask_feature_length,
-                    device=x.device,
+#                    #device=x.device,
                     min_masks=1
-                )
+                )).to(device)
                 wav2vec_z[mask_feature_indices[:, None].expand(-1, sequence_length, -1)] = 0
             wav2vec_z = wav2vec_z.transpose(1, 2)
         wav2vec_c = self.wav2vec.feature_aggregator(wav2vec_z)
@@ -135,26 +137,26 @@ class Wav2vec2Wrapper(nn.Module):
 
                 # apply SpecAugment along time axis
                 if self.mask_time_prob > 0:
-                    mask_time_indices = _compute_mask_indices(
+                    mask_time_indices = torch.Tensor(_compute_mask_indices(
                         (batch_size, sequence_length),
                         self.mask_time_prob,
                         self.mask_time_length,
                         min_masks=2,
-                        device=x.device
-                    )
-                    masked_indicies = mask_time_indices & mask
+                        #device=x.device
+                    )).to(x.device)
+                    masked_indicies = mask_time_indices.int() & mask
                     flip_mask = torch.rand((batch_size, sequence_length), device=masked_indicies.device) > self.observe_time_prob
-                    x[masked_indicies & flip_mask] = self.wav2vec2.masked_spec_embed.to(x.dtype)
+                    x[masked_indicies.long() & flip_mask] = self.wav2vec2.masked_spec_embed.to(x.dtype)
 
                 # apply SpecAugment along feature axis
                 if self.mask_feature_prob > 0:
-                    mask_feature_indices = _compute_mask_indices(
+                    mask_feature_indices = torch.Tensor(_compute_mask_indices(
                         (batch_size, hidden_size),
                         self.mask_feature_prob,
                         self.mask_feature_length,
-                        device=x.device,
+    #                    #device=x.device,
                         min_masks=1
-                    )
+                    )).to(x.device).long()
                     x[mask_feature_indices[:, None].expand(-1, sequence_length, -1)] = 0
         x = self.wav2vec2.encoder(x, attention_mask=mask)[0]
         reps = F.relu(x)
@@ -194,14 +196,14 @@ class Wav2vec2PretrainWrapper(nn.Module):
             feat_shape = (batch_size, sequence_length)
             length = self.get_feat_extract_output_lengths(length)
             attn_mask = prepare_mask(length, feat_shape, x.dtype, x.device)
-            mask_time_indices = _compute_mask_indices(
+            mask_time_indices = torch.Tensor(_compute_mask_indices(
                 feat_shape,
                 self.wav2vec2PT.config.mask_time_prob,
                 self.wav2vec2PT.config.mask_time_length,
                 min_masks=2,
-                device=x.device,
+                #device=x.device,
                 attention_mask=attn_mask
-            )
+            )).to(device).long()
         x = self.wav2vec2PT(x, mask_time_indices=mask_time_indices)#, attention_mask=attn_mask)
         return x
 

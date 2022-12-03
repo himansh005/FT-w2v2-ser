@@ -16,6 +16,7 @@ from utils.metrics import ConfusionMetrics
 
 from pretrain.trainer import PretrainedRNNHead
 from tqdm import tqdm
+import csv
 
 class DownstreamGeneral(LightningModule):
     def __init__(self, hparams):
@@ -24,7 +25,6 @@ class DownstreamGeneral(LightningModule):
             hparams = argparse.Namespace(**hparams)
         self.hp = hparams
         self.dataset = CustomEmoDataset(self.hp.datadir, self.hp.labelpath, maxseqlen=self.hp.maxseqlen)
-
         if self.hp.pretrained_path is not None:
             self.model = PretrainedRNNHead.load_from_checkpoint(self.hp.pretrained_path, strict=False,
                                                                 n_classes=self.dataset.nemos,
@@ -43,7 +43,12 @@ class DownstreamGeneral(LightningModule):
         )
 
         self.criterion = nn.CrossEntropyLoss(weight=weights)
-
+        
+        with open(os.path.join(hparams.output_path,'predictions.csv'), 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(["file", "true", "predicted"])
+            del writer
+        
         # Define metrics
         if hasattr(self.dataset, 'val_dataset'):
             self.valid_met = ConfusionMetrics(self.dataset.nemos)
@@ -85,7 +90,7 @@ class DownstreamGeneral(LightningModule):
         return loader
 
     def training_step(self, batch, batch_idx):
-        feats, length, label = batch
+        feats, length, label, fname  = batch
         pout = self(feats, length)
         loss = self.criterion(pout, label)
         tqdm_dict = {'loss': loss}
@@ -93,7 +98,7 @@ class DownstreamGeneral(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        feats, length, label = batch
+        feats, length, label, fname  = batch
         pout = self(feats, length)
         loss = self.criterion(pout, label)
         for l, p in zip(label, pout):
@@ -109,10 +114,21 @@ class DownstreamGeneral(LightningModule):
         self.valid_met.clear()
 
     def test_step(self, batch, batch_idx):
-        feats, label = batch
+        feats, label, fname = batch
         length = torch.LongTensor([feats.size(1)]).to(label.device)
         pout = self(feats, length)
-        self.test_met.fit(int(label), int(pout.argmax()))
+        prediction = int(pout.argmax())
+        
+        arr = []
+        for i in range(len(label)):
+            arr.append([fname[i], int(label[i]), prediction])
+
+        with open(os.path.join(self.hp.output_path,'predictions.csv'), 'a', newline='') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',',quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            writer.writerows(arr)
+            del writer
+
+        self.test_met.fit(int(label), prediction)
 
     def on_test_epoch_end(self):
         """Report metrics."""

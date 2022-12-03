@@ -35,7 +35,7 @@ class CustomEmoDataset:
                 output_length = x[0].shape[0]
                 over = target_seqlen - x[0].shape[0]
                 x[0] = np.pad(x[0], [0, over])
-            ret = (x[0], output_length, x[1])
+            ret = (x[0], output_length, x[1], x[2])
             return ret
         batch = list(map(trunc, batch))
         return default_collate(batch)
@@ -70,4 +70,4 @@ class _CustomEmoDataset(data.Dataset):
         wav, _sr = sf.read(dataname)
         _label = self.label[self.datasetbase[i]]
         label = self.labeldict[_label]
-        return wav.astype(np.float32), label
+        return wav.astype(np.float32), label, dataname
