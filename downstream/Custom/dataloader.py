@@ -81,7 +81,7 @@ class CustomEmoDatasetHuBERT:
         return batch
 CustomEmoDataset=CustomEmoDatasetHuBERT
 
-class _CustomEmoDatasetWav2Vec(data.Dataset):
+class _CustomEmoDataset(data.Dataset):
     def __init__(self, datadir, label, emoset,
                  split, maxseqlen=12):
         super().__init__()
@@ -113,36 +113,4 @@ class _CustomEmoDatasetWav2Vec(data.Dataset):
         label = self.labeldict[_label]
         return wav.astype(np.float32), label, dataname
 
-class _CustomEmoDatasetHuBERT(data.Dataset):
-    def __init__(self, datadir, label, emoset,
-                 split, maxseqlen=12):
-        super().__init__()
-        self.maxseqlen = maxseqlen * 16000 #Assume sample rate of 16000
-        self.split = split
-        self.label = label #{wavname: emotion_label}
-        self.emos = Counter([self.label[n] for n in self.label.keys()])
-        self.emoset = emoset
-        self.labeldict = {k: i for i, k in enumerate(self.emoset)}
-        self.datasetbase = list(self.label.keys())
-        self.dataset = [os.path.join(datadir, x) for x in self.datasetbase]
 
-        #Print statistics:
-        print (f'Statistics of {self.split} splits:')
-        print ('----Involved Emotions----')
-        for k, v in self.emos.items():
-            print (f'{k}: {v} examples')
-        l = len(self.dataset)
-        print (f'Total {l} examples')
-        print ('----Examples Involved----\n')
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __getitem__(self, i):
-        dataname = self.dataset[i]
-        wav, _sr = sf.read(dataname)
-        _label = self.label[self.datasetbase[i]]
-        label = self.labeldict[_label]
-        return wav.astype(np.float32), label, dataname
-
-_CustomEmoDataset=_CustomEmoDatasetHuBERT

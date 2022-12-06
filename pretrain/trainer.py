@@ -271,6 +271,41 @@ class PretrainedRNNHead(pl.LightningModule):
         logits = self.linear_head(logits)
         return logits
 
+class PretrainedEmoFeatureHead(pl.LightningModule):
+    def __init__(self, n_classes, backend='wav2vec2', wav2vecpath=None):
+        assert backend in ['wav2vec2', 'wav2vec','hubert']
+        super().__init__()
+        self.backend = backend
+        if backend == 'wav2vec2':
+            self.wav2vec2 = Wav2vec2Wrapper(pretrain=False)
+            feature_dim = 768
+        if backend == 'hubert':
+            self.hubert = HuBertWrapper(pretrain=False)
+            feature_dim = 768
+        else:
+            assert wav2vecpath is not None
+            self.wav2vec = Wav2vecWrapper(wav2vecpath)
+            feature_dim = 512
+        self.linear_head = nn.Sequential(
+            nn.ReLU(),
+            nn.Linear(768, n_classes)
+        )
+
+    def trainable_params(self):
+        return list(self.linear_head.parameters()) + list(getattr(self, self.backend).trainable_params())
+
+    def forward(self, x, length):
+        reps = getattr(self, self.backend)(x, length)
+        last_feat_pos = getattr(self, self.backend).get_feat_extract_output_lengths(length) - 1
+        logits = reps.permute(1, 0, 2) #L, B, C
+        masks = torch.arange(logits.size(0), device=logits.device).expand(last_feat_pos.size(0), -1) < last_feat_pos.unsqueeze(1)
+        masks = masks.float()
+        #avg pooling (masks and sum logits only up till seq len, then divide by seq len)
+        avg_reps = (logits * masks.T.unsqueeze(-1)).sum(0) / last_feat_pos.unsqueeze(1)
+        logits = self.linear_head(avg_reps)
+        return avg_reps,logits
+
+
 class ContinueFinetuningBaseline(pl.LightningModule):
     def __init__(self, maxstep, batch_size,
                  lr, warmup_step, maxseqlen, nclusters,
