@@ -9,7 +9,7 @@ conda activate /ocean/projects/cis220078p/chsieh1/miniconda3/envs/ser
 
 . paths.sh
 
-python -u run_downstream_contrastive.py --precision 17 \
+python -u run_downstream_contrastive.py --precision 16 \
                                               --datadir ./ \
                                               --labelpath ESD/labels.json \
                                               --saving_path checkpoints-sb/xent1 \
