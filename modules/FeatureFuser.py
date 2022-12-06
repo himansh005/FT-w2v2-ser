@@ -5,8 +5,10 @@ import torch
 
 from utils.helper_funcs import loadwav2vec
 from transformers import Wav2Vec2ForPreTraining, Wav2Vec2Config
+from transformers import HubertModel
 import argparse
 from transformers.models.wav2vec2.modeling_wav2vec2 import _compute_mask_indices
+from pytorch_lightning.core.lightning import LightningModule
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -217,5 +219,87 @@ class Wav2vec2PretrainWrapper(nn.Module):
             # from https://pytorch.org/docs/stable/generated/torch.nn.Conv1d.html
             return (input_length - kernel_size) // stride + 1
         for kernel_size, stride in zip(self.wav2vec2.config.conv_kernel, self.wav2vec2.config.conv_stride):
+            input_length = _conv_out_length(input_length, kernel_size, stride)
+        return input_length
+
+
+class HuBertWrapper(LightningModule):
+    def __init__(self, pretrain=True):
+        super().__init__()
+        self.hubert = HubertModel.from_pretrained("facebook/hubert-base-ls960")
+        #Disable gradient checkpointing for ddp
+        self.pretrain = pretrain
+        # if pretrain:
+        #     self.mask_time_length = 15
+        #     self.mask_time_prob = 0.06 #Probability of each time step is masked!
+        #     self.observe_time_prob = 0.0 #Percentage of tokens that are perserved
+        #     self.mask_feature_prob = 0
+        # else:
+        #     #SpecAug
+        #     self.mask_time_length = 15
+        #     self.mask_time_prob = 0.08
+        #     self.observe_time_prob = 0.0
+
+        #     self.mask_feature_length = 64
+        #     self.mask_feature_prob = 0.05
+
+
+    def trainable_params(self):
+        ret = list(self.hubert.encoder.parameters())
+        return ret
+
+    def forward(self, x, length=None):
+        output = self.hubert(x) #hubert already applied specaugment
+        return output.last_hidden_state
+
+    #     with torch.no_grad():
+    #         x = self.hubert.feature_extractor(x)
+    #         x = x.transpose(1, 2) #New version of huggingface
+    #         x, _ = self.hubert.feature_projection(x) #New version of huggingface
+    #         mask = None
+    #         if length is not None:
+    #             length = self.get_feat_extract_output_lengths(length)
+    #             mask = prepare_mask(length, x.shape[:2], x.dtype, x.device)
+    #         if self.pretrain or self.training:
+    #             batch_size, sequence_length, hidden_size = x.size()
+
+    #             # apply SpecAugment along time axis
+    #             if self.mask_time_prob > 0:
+    #                 mask_time_indices = torch.Tensor(_compute_mask_indices(
+    #                     (batch_size, sequence_length),
+    #                     self.mask_time_prob,
+    #                     self.mask_time_length,
+    #                     min_masks=2,
+    #                     #device=x.device
+    #                 )).to(x.device)
+    #                 masked_indicies = mask_time_indices.int() & mask
+    #                 flip_mask = torch.rand((batch_size, sequence_length), device=masked_indicies.device) > self.observe_time_prob
+    #                 x[masked_indicies.long() & flip_mask] = self.wav2vec2.masked_spec_embed.to(x.dtype)
+
+    #             # apply SpecAugment along feature axis
+    #             if self.mask_feature_prob > 0:
+    #                 mask_feature_indices = torch.Tensor(_compute_mask_indices(
+    #                     (batch_size, hidden_size),
+    #                     self.mask_feature_prob,
+    #                     self.mask_feature_length,
+    # #                    #device=x.device,
+    #                     min_masks=1
+    #                 )).to(x.device).long()
+    #                 x[mask_feature_indices[:, None].expand(-1, sequence_length, -1)] = 0
+    #     x = self.hubert.encoder(x, attention_mask=mask)[0]
+    #     reps = F.relu(x)
+    #     if self.pretrain:
+    #         return reps, masked_indicies
+    #     return reps
+        #From huggingface
+    def get_feat_extract_output_lengths(self, input_length):
+        """
+        Computes the output length of the convolutional layers
+        """
+        def _conv_out_length(input_length, kernel_size, stride):
+            # 1D convolutional layer output length formula taken
+            # from https://pytorch.org/docs/stable/generated/torch.nn.Conv1d.html
+            return (input_length - kernel_size) // stride + 1
+        for kernel_size, stride in zip(self.hubert.config.conv_kernel, self.hubert.config.conv_stride):
             input_length = _conv_out_length(input_length, kernel_size, stride)
         return input_length

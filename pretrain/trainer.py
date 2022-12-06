@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from .dataloader import PretrainEmoDataset, SecondPhaseEmoDataset, RandomBucketSampler, StandardSampler, BaselineDataset
 from torch.utils import data
-from modules.FeatureFuser import Wav2vecWrapper, Wav2vec2Wrapper, Wav2vec2PretrainWrapper
+from modules.FeatureFuser import Wav2vecWrapper, Wav2vec2Wrapper, Wav2vec2PretrainWrapper, HuBertWrapper
 from modules.NN import LinearHead, RNNLayer
 from utils.metrics import ConfusionMetrics
 import pytorch_lightning.core.lightning as pl
@@ -239,11 +239,14 @@ class SecondPassEmoClassifier(pl.LightningModule):
 
 class PretrainedRNNHead(pl.LightningModule):
     def __init__(self, n_classes, backend='wav2vec2', wav2vecpath=None):
-        assert backend in ['wav2vec2', 'wav2vec']
+        assert backend in ['wav2vec2', 'wav2vec','hubert']
         super().__init__()
         self.backend = backend
         if backend == 'wav2vec2':
             self.wav2vec2 = Wav2vec2Wrapper(pretrain=False)
+            feature_dim = 768
+        if backend == 'hubert':
+            self.hubert = HuBertWrapper(pretrain=False)
             feature_dim = 768
         else:
             assert wav2vecpath is not None

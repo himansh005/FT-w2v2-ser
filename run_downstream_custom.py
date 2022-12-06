@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--datadir', type=str, required=True)
     parser.add_argument('--labelpath', type=str, required=True)
     parser.add_argument('--pretrained_path', type=str, default=None)
-    parser.add_argument('--model_type', type=str, choices=['wav2vec', 'wav2vec2'], default='wav2vec2')
+    parser.add_argument('--model_type', type=str, choices=['wav2vec', 'wav2vec2','hubert'], default='hubert')
 
     parser.add_argument('--save_top_k', type=int, default=1)
     parser.add_argument('--cpu_torchscript', action='store_true')
@@ -55,8 +55,8 @@ def main():
         resume_from_checkpoint=None,
         check_val_every_n_epoch=1,
         max_epochs=hparams.max_epochs,
-        gpus=1,
-        # accelerator='cpu'
+        devices=1,
+        accelerator='gpu'
     )
     trainer.fit(model)
 
