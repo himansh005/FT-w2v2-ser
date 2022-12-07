@@ -38,13 +38,14 @@ def main():
         os.makedirs(hparams.output_path)
 
     model = DownstreamGeneral(hparams)
-
+    if hparams.pretrained_path is not None:
+        model = model.load_from_checkpoint(hparams.pretrained_path, strict=False,hparams=hparams)
     checkpoint_callback = ModelCheckpoint(
         dirpath=hparams.saving_path,
         filename='{epoch:02d}-{valid_loss:.3f}-{valid_UAR:.5f}' if hasattr(model, 'valid_met') else None,
         save_top_k=args.save_top_k if hasattr(model, 'valid_met') else 0,
         verbose=True,
-        save_weights_only=True,
+        save_weights_only=False,
         monitor='valid_UAR' if hasattr(model, 'valid_met') else None,
         mode='max'
     )

@@ -14,7 +14,7 @@ parser.add_argument('--num_clusters', type=str, default='8,64,512,4096')
 
 parser.add_argument('--model_path', type=str, default=None)
 parser.add_argument('--wav2vecpath', type=str, default=None)
-parser.add_argument('--model_type', type=str, choices=['wav2vec', 'wav2vec2'], default='wav2vec2')
+parser.add_argument('--model_type', type=str, choices=['wav2vec', 'wav2vec2','hubert'], default='hubert')
 parser.add_argument('--precision', type=int, choices=[16, 32], default=32)
 parser.add_argument('--sample_ratio', type=float, default=0.2)
 parser.add_argument('--unsupdatadir', type=str, default=None)
@@ -58,8 +58,9 @@ def eval_kmeans(seq, index):
     return labels
 
 
-device = torch.device('cuda:0')
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if args.model_path:
+    import pdb;pdb.set_trace()
     model = MinimalClassifier.load_from_checkpoint(args.model_path, strict=False,
                                                    backend=args.model_type, wav2vecpath=args.wav2vecpath)
 else:

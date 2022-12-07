@@ -26,7 +26,7 @@ class DownstreamGeneral(LightningModule):
             hparams = argparse.Namespace(**hparams)
         self.hp = hparams
         self.dataset = CustomEmoDataset(self.hp.datadir, self.hp.labelpath, maxseqlen=self.hp.maxseqlen)
-        if self.hp.pretrained_path is not None:
+        if self.hp.pretrained_path is not None and self.hp.model_type!='hubert':
             self.model = PretrainedRNNHead.load_from_checkpoint(self.hp.pretrained_path, strict=False,
                                                                 n_classes=self.dataset.nemos,
                                                                 backend=self.hp.model_type)

@@ -106,12 +106,15 @@ class PretrainedEmoClassifier(pl.LightningModule):
         return loss
 
 class MinimalClassifier(pl.LightningModule):
-    def __init__(self, backend='wav2vec2', wav2vecpath=None):
-        assert backend in ['wav2vec2', 'wav2vec']
+    def __init__(self, backend='hubert', wav2vecpath=None):
+        assert backend in ['wav2vec2', 'wav2vec','hubert']
         super().__init__()
         self.backend = backend
         if backend == 'wav2vec2':
             self.wav2vec2 = Wav2vec2Wrapper(pretrain=False)
+        if backend == 'hubert':
+            self.hubert = HuBertWrapper(pretrain=False)
+            # self.model.hubert=self.hubert
         else:
             assert wav2vecpath is not None
             self.wav2vec = Wav2vecWrapper(wav2vecpath)
