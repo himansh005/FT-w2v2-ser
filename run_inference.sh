@@ -6,18 +6,19 @@ eval "$(conda shell.bash hook)"
 
 xent_alpha=$2
 ckptdir=$1/alpha_${xent_alpha}
-outputdir=outputs/alpha_${xent_alpha}
-if [ -e ${ckptdir} ];then echo "exists";exit 1;fi
- if [ -e ${outputdir} ];then echo "exists";exit 1;fi
+outputdir=outputs/reload_alpha_${xent_alpha}
+ckpt=$3
 conda activate /ocean/projects/cis220078p/chsieh1/miniconda3/envs/ser
 
 . paths.sh
 
-python -u run_downstream_contrastive.py --precision 16 \
+python -u run_downstream_inference.py --precision 16 \
                                               --datadir ./ \
                                               --labelpath ESD/labels.json \
                                               --saving_path ${ckptdir} \
-                                              --output_path ${outputdir}\
+                                              --output_path ${outputdir} \
                                               --nworkers 4 \
                                               --batch_size 8 \
+                                              --pretrained_path ${ckpt} \
 					--xent_alpha ${xent_alpha}
+                                            #   --resume_from_ckpt ${ckpt} \

@@ -288,7 +288,7 @@ class PretrainedEmoFeatureHead(pl.LightningModule):
             feature_dim = 512
         self.linear_head = nn.Sequential(
             nn.ReLU(),
-            nn.Linear(768, n_classes)
+            nn.Linear(feature_dim, n_classes)
         )
 
     def trainable_params(self):
