@@ -19,5 +19,6 @@ python -m pdb cluster.py --model_path ${ckpt_path} \
                     --outputdir ${outdir}/alpha_${xent_alpha} \
                     --model_type hubert \
                     --sample_ratio 1.0 \
-                    --num_clusters "100,200,500"
+                    --num_clusters "512,1024,2048,4096"
+                    #"100,200,500"
                     #,512,1024,2048,4096"

@@ -6,9 +6,9 @@ import numpy as np
 from collections import Counter
 import soundfile as sf
 from torch.utils.data.dataloader import default_collate
-from transformers import Wav2Vec2FeatureExtractor
+# from transformers import Wav2Vec2FeatureExtractor
 
-processor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/hubert-base-ls960")
+# processor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/hubert-base-ls960")
 
 class CustomEmoDatasetW2V:
     def __init__(self, datadir, labeldir, maxseqlen):
@@ -75,8 +75,8 @@ class CustomEmoDatasetHuBERT:
         # import pdb;pdb.set_trace()
         batch = list(map(trunc, batch))
         batch = default_collate(batch)
-        processed = processor(batch[0].numpy(),sampling_rate=16000, padding=True, return_tensors="pt").input_values.squeeze()
-        batch=[processed,batch[1],batch[2],batch[3]]
+        # processed = processor(batch[0].numpy(),sampling_rate=16000, padding=True, return_tensors="pt").input_values.squeeze()
+        # batch=[processed,batch[1],batch[2],batch[3]]
 
         return batch
 CustomEmoDataset=CustomEmoDatasetHuBERT

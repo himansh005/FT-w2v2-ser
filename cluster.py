@@ -111,6 +111,7 @@ for nclus in nclusters:
 
 #Run inference to get the cluster assignments of all data
 print ("Start second phase inference of pseudo-labels")
+_data = MixedDataset(args.datadir, args.unsupdatadir, args.labelpath,all=True)
 dataloader = data.DataLoader(_data,
                              batch_size=1,
                              num_workers=8,

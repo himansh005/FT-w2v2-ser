@@ -110,13 +110,16 @@ class UnlabeledDataset(data.Dataset):
         return wav.astype(np.float32), self.datasetbase[i]
 
 class MixedDatasetHuBERT(data.Dataset):
-    def __init__(self, datadir, unsupdatadir, labelpath=None):
+    def __init__(self, datadir, unsupdatadir, labelpath=None,all=False):
         if not labelpath:
             self.datasetbase = [x for x in os.listdir(datadir) if x[-4:] == '.wav']
         else:
             with open(labelpath, 'r') as f:
                 label = json.load(f)
-            self.datasetbase = list(label['Train'].keys())
+            if all:
+                self.datasetbase=list(label['Train'].keys())+list(label['Val'].keys())+list(label['Test'].keys())
+            else:
+                self.datasetbase = list(label['Train'].keys())
         self.dataset = [os.path.join(datadir, x) for x in self.datasetbase]
         self.processor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/hubert-base-ls960")
 
@@ -161,13 +164,16 @@ class MixedDatasetHuBERT(data.Dataset):
         return wav.astype(np.float32), self.datasetbase[i]
 
 class MixedDatasetW2V(data.Dataset):
-    def __init__(self, datadir, unsupdatadir, labelpath=None):
+    def __init__(self, datadir, unsupdatadir, labelpath=None,all=True):
         if not labelpath:
             self.datasetbase = [x for x in os.listdir(datadir) if x[-4:] == '.wav']
         else:
             with open(labelpath, 'r') as f:
                 label = json.load(f)
-            self.datasetbase = list(label['Train'].keys())
+            if all:
+                self.datasetbase=list(label['Train'].keys())+list(label['Val'].keys())+list(label['Test'].keys())
+            else:
+                self.datasetbase = list(label['Train'].keys())
         self.dataset = [os.path.join(datadir, x) for x in self.datasetbase]
         if unsupdatadir:
             unsupdatadir = unsupdatadir.rstrip('/')

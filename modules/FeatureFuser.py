@@ -6,6 +6,8 @@ import torch
 from utils.helper_funcs import loadwav2vec
 from transformers import Wav2Vec2ForPreTraining, Wav2Vec2Config
 from transformers import HubertModel
+from transformers import Wav2Vec2FeatureExtractor
+
 import argparse
 from transformers.models.wav2vec2.modeling_wav2vec2 import _compute_mask_indices
 from pytorch_lightning.core.lightning import LightningModule
@@ -229,6 +231,7 @@ class HuBertWrapper(LightningModule):
         self.hubert = HubertModel.from_pretrained("facebook/hubert-base-ls960")
         #Disable gradient checkpointing for ddp
         self.pretrain = pretrain
+        self.processor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/hubert-base-ls960")
         # if pretrain:
         #     self.mask_time_length = 15
         #     self.mask_time_prob = 0.06 #Probability of each time step is masked!
@@ -249,7 +252,9 @@ class HuBertWrapper(LightningModule):
         return ret
 
     def forward(self, x, length=None):
-        output = self.hubert(x) #hubert already applied specaugment
+        # import pdb;pdb.set_trace()
+        x=self.processor(x,sampling_rate=16000, padding=True, return_tensors="pt").to(device)
+        output = self.hubert(x.input_values.squeeze(0)) #hubert already applied specaugment
         return output.last_hidden_state
 
     #     with torch.no_grad():
