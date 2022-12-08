@@ -106,7 +106,7 @@ class PretrainedEmoClassifier(pl.LightningModule):
         return loss
 
 class MinimalClassifier(pl.LightningModule):
-    def __init__(self, backend='hubert', wav2vecpath=None):
+    def __init__(self, backend='hubert', wav2vecpath=None,n_classes=5):
         assert backend in ['wav2vec2', 'wav2vec','hubert']
         super().__init__()
         self.backend = backend
@@ -114,14 +114,23 @@ class MinimalClassifier(pl.LightningModule):
             self.wav2vec2 = Wav2vec2Wrapper(pretrain=False)
         if backend == 'hubert':
             self.hubert = HuBertWrapper(pretrain=False)
-            # self.model.hubert=self.hubert
+        #     self.linear_head = nn.Sequential(
+        #     nn.ReLU(),
+        #     nn.Linear(768, n_classes)
+        # )
         else:
             assert wav2vecpath is not None
             self.wav2vec = Wav2vecWrapper(wav2vecpath)
 
     def forward(self, x, length=None):
         reps = getattr(self, self.backend)(x, length)
-        return reps
+        # last_feat_pos = getattr(self, self.backend).get_feat_extract_output_lengths(length) - 1
+        # logits = reps.permute(1, 0, 2) #L, B, C
+        # masks = torch.arange(logits.size(0), device=logits.device).expand(last_feat_pos.size(0), -1) < last_feat_pos.unsqueeze(1)
+        # masks = masks.float()
+        # #avg pooling (masks and sum logits only up till seq len, then divide by seq len)
+        # avg_reps = (logits * masks.T.unsqueeze(-1)).sum(0) / last_feat_pos.unsqueeze(1)
+        return reps#,avg_reps
 
 class SecondPassEmoClassifier(pl.LightningModule):
     def __init__(self, maxstep, batch_size,
@@ -258,7 +267,7 @@ class PretrainedRNNHead(pl.LightningModule):
         self.rnn_head = nn.LSTM(feature_dim, 256, 1, bidirectional=True)
         self.linear_head = nn.Sequential(
             nn.ReLU(),
-            nn.Linear(768, n_classes)
+            nn.Linear(feature_dim, n_classes)
         )
 
     def trainable_params(self):

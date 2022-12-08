@@ -60,7 +60,6 @@ def eval_kmeans(seq, index):
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if args.model_path:
-    import pdb;pdb.set_trace()
     model = MinimalClassifier.load_from_checkpoint(args.model_path, strict=False,
                                                    backend=args.model_type, wav2vecpath=args.wav2vecpath)
 else:
@@ -73,7 +72,7 @@ nclusters = [int(x) for x in args.num_clusters.split(',')]
 
 # First Round Sampling data for k-means cluster estimation
 print ('Sampling data for estimation of k-means parameters')
-hidden_size = 768 if args.model_type == 'wav2vec2' else 512
+hidden_size = 768 if args.model_type in ['wav2vec2','hubert'] else 512
 sampled_reps = np.zeros((max(nclusters) * 1000, hidden_size), dtype=np.float32) #pre-allocate contiguous RAM
 head = 0
 

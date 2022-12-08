@@ -11,6 +11,7 @@ from pathlib import Path
 from torch.utils.data.dataloader import default_collate
 import math
 from tqdm import tqdm
+from transformers import Wav2Vec2FeatureExtractor
 
 class PretrainEmoDataset(data.Dataset):
     def __init__(self, datadir, labeldir, returnname=False, maxseqlen=12*16000, labeling_method='hard'):
@@ -108,7 +109,58 @@ class UnlabeledDataset(data.Dataset):
             return wav.astype(np.float32)
         return wav.astype(np.float32), self.datasetbase[i]
 
-class MixedDataset(data.Dataset):
+class MixedDatasetHuBERT(data.Dataset):
+    def __init__(self, datadir, unsupdatadir, labelpath=None):
+        if not labelpath:
+            self.datasetbase = [x for x in os.listdir(datadir) if x[-4:] == '.wav']
+        else:
+            with open(labelpath, 'r') as f:
+                label = json.load(f)
+            self.datasetbase = list(label['Train'].keys())
+        self.dataset = [os.path.join(datadir, x) for x in self.datasetbase]
+        self.processor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/hubert-base-ls960")
+
+        if unsupdatadir:
+            unsupdatadir = unsupdatadir.rstrip('/')
+            self.unsupdatasetbase = [str(x)[len(unsupdatadir)+1:] for x in Path(unsupdatadir).rglob('*.wav')]
+            self.unsupdataset = [os.path.join(unsupdatadir, x) for x in self.unsupdatasetbase]
+            self.datasetbase = self.datasetbase + self.unsupdatasetbase
+            self.dataset = self.dataset + self.unsupdataset
+        #Print statistics:
+        l = len(self.dataset)
+        print (f'Total {l} examples')
+    def seqCollate(self, batch):
+        getlen = lambda x: x[0].shape[0]
+        max_seqlen = max(map(getlen, batch))
+        target_seqlen = min(self.maxseqlen, max_seqlen)
+        def trunc(x):
+            x = list(x)
+            if x[0].shape[0] >= target_seqlen:
+                x[0] = x[0][:target_seqlen]
+                output_length = target_seqlen
+            else:
+                output_length = x[0].shape[0]
+                over = target_seqlen - x[0].shape[0]
+                x[0] = np.pad(x[0], [0, over])
+            ret = (x[0], output_length, x[1], x[2])
+            return ret
+        # import pdb;pdb.set_trace()
+        batch = list(map(trunc, batch))
+        batch = default_collate(batch)
+        processed = self.processor(batch[0].numpy(),sampling_rate=16000, padding=True, return_tensors="pt").input_values.squeeze()
+        import pdb;pdb.set_trace()
+        batch=[processed,batch[1],batch[2],batch[3]]
+
+        return batch
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, i):
+        dataname = self.dataset[i]
+        wav, _sr = sf.read(dataname)
+        return wav.astype(np.float32), self.datasetbase[i]
+
+class MixedDatasetW2V(data.Dataset):
     def __init__(self, datadir, unsupdatadir, labelpath=None):
         if not labelpath:
             self.datasetbase = [x for x in os.listdir(datadir) if x[-4:] == '.wav']
@@ -134,6 +186,8 @@ class MixedDataset(data.Dataset):
         dataname = self.dataset[i]
         wav, _sr = sf.read(dataname)
         return wav.astype(np.float32), self.datasetbase[i]
+
+MixedDataset=MixedDatasetHuBERT
 
 class SecondPhaseEmoDataset(data.Dataset):
     def __init__(self, datadir, unsupdatadir,
