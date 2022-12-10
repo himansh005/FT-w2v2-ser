@@ -122,15 +122,25 @@ class MinimalClassifier(pl.LightningModule):
             assert wav2vecpath is not None
             self.wav2vec = Wav2vecWrapper(wav2vecpath)
 
-    def forward(self, x, length=None):
-        reps = getattr(self, self.backend)(x, length)
+    def forward(self, x, length=None,layer=None):
+        if self.backend == 'hubert':
+            if layer is None:
+                print("did not pass layer, default to last")
+                layer=-1
+            reps = getattr(self, self.backend)(x, length,output_hidden_states=True)
+            final_reps = reps[-1]
+            avg_reps = torch.mean(final_reps.squeeze(0),dim=0)
+            reps = reps[layer]
+            return reps, avg_reps
+        else:
+            reps = getattr(self, self.backend)(x, length)
+            return reps
         # last_feat_pos = getattr(self, self.backend).get_feat_extract_output_lengths(length) - 1
         # logits = reps.permute(1, 0, 2) #L, B, C
         # masks = torch.arange(logits.size(0), device=logits.device).expand(last_feat_pos.size(0), -1) < last_feat_pos.unsqueeze(1)
         # masks = masks.float()
         # #avg pooling (masks and sum logits only up till seq len, then divide by seq len)
         # avg_reps = (logits * masks.T.unsqueeze(-1)).sum(0) / last_feat_pos.unsqueeze(1)
-        return reps#,avg_reps
 
 class SecondPassEmoClassifier(pl.LightningModule):
     def __init__(self, maxstep, batch_size,
@@ -284,7 +294,7 @@ class PretrainedRNNHead(pl.LightningModule):
         return logits
 
 class PretrainedEmoFeatureHead(pl.LightningModule):
-    def __init__(self, n_classes, backend='wav2vec2', wav2vecpath=None):
+    def __init__(self, n_classes, backend='wav2vec2', wav2vecpath=None, use_rnn=False):
         assert backend in ['wav2vec2', 'wav2vec','hubert']
         super().__init__()
         self.backend = backend
@@ -302,6 +312,11 @@ class PretrainedEmoFeatureHead(pl.LightningModule):
             nn.ReLU(),
             nn.Linear(feature_dim, n_classes)
         )
+        self.use_rnn=use_rnn
+        if use_rnn:
+            self.rnn_head = nn.LSTM(feature_dim, feature_dim/2, 1, bidirectional=True)
+
+
 
     def trainable_params(self):
         return list(self.linear_head.parameters()) + list(getattr(self, self.backend).trainable_params())
@@ -309,6 +324,8 @@ class PretrainedEmoFeatureHead(pl.LightningModule):
     def forward(self, x, length):
         reps = getattr(self, self.backend)(x, length)
         last_feat_pos = getattr(self, self.backend).get_feat_extract_output_lengths(length) - 1
+        if self.use_rnn:
+            reps = self.rnn_head(reps)
         logits = reps.permute(1, 0, 2) #L, B, C
         masks = torch.arange(logits.size(0), device=logits.device).expand(last_feat_pos.size(0), -1) < last_feat_pos.unsqueeze(1)
         masks = masks.float()

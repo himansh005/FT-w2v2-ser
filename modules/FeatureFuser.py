@@ -251,12 +251,15 @@ class HuBertWrapper(LightningModule):
         ret = list(self.hubert.encoder.parameters())
         return ret
 
-    def forward(self, x, length=None):
+    def forward(self, x, length=None, output_hidden_states=False):
         # import pdb;pdb.set_trace()
         x=self.processor(x,sampling_rate=16000, padding=True, return_tensors="pt").to(device)
-        output = self.hubert(x.input_values.squeeze(0)) #hubert already applied specaugment
-        return output.last_hidden_state
-
+        if output_hidden_states:
+            output =  self.hubert(x.input_values.squeeze(0),output_hidden_states=True)
+            return output.hidden_states
+        else:
+            output = self.hubert(x.input_values.squeeze(0)) #hubert already applied specaugment
+            return output.last_hidden_state
     #     with torch.no_grad():
     #         x = self.hubert.feature_extractor(x)
     #         x = x.transpose(1, 2) #New version of huggingface

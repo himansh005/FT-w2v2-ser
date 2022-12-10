@@ -5,7 +5,7 @@ import random
 from pathlib import Path
 from glob import glob
 import sys
-
+import re
 #un-used
 labeldict = {
     'ang': 'anger',
@@ -28,16 +28,18 @@ labels = {
 }
 
 IEMOCAP_DIR = Path(sys.argv[1])
-
-paths = glob(os.path.join(IEMOCAP_DIR, "*/*/*/*.wav"))
+ref_labels_path = Path(sys.argv[2])
+with ref_labels_path.open() as f:
+    ref_labels = json.load(f)
+paths = glob(os.path.join(IEMOCAP_DIR, "*.wav"))
+ptrn = re.compile(r"(?<!_[0-3])_gen.wav$")
+paths = [path for path in paths if ptrn.search(path)]
+tlabs = {Path(k).name.split('.')[0]:v for k,v in ref_labels['Test'].items()}
 for path in paths:
+    uttid = Path(path).name.rsplit('_',1)[0]
 
-    path_arr = path.split("/")
-    num = int(path_arr[-4])
-    if(num<11):
-        continue
-    type = typedict[path_arr[-2]]
-    emotion = path_arr[-3].lower()
+    type = 'Test'
+    emotion = tlabs[uttid]
     labels[type][path] = emotion
     # break
     # if(len(labels["Train"])>10 and len(labels["Val"])>10 and len(labels["Test"])>10):

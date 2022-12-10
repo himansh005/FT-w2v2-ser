@@ -3,6 +3,7 @@ from pathlib import Path
 import json   
 import sys
 from tqdm import tqdm
+import statistics
 if __name__=="__main__":
     if len(sys.argv)<2:
         print('usage: python uer.py cluster_file')
@@ -18,6 +19,7 @@ if __name__=="__main__":
             clus=json.load(f)                                                                                                                              
                                                                                                                                           
     d = {}     
+    diversity = {}
     for k in clus:                                                                                                                                         
             karr=k.split('/')                                                                                                                                 
             _,spkr,label,split,name=karr
@@ -27,8 +29,11 @@ if __name__=="__main__":
                     d[split]={}                                                                                                                               
             num=int(name.split('.')[0].split('_')[1])                                                                                                         
             if label not in d[split]:                                                                                                                         
-                    d[split][label]=[]                                                                                                                        
-            d[split][label].append((num,k,spkr,val)) 
+                d[split][label]=[]            
+        
+            diversity = len(set(val))/len(val)
+            d[split][label].append((num,k,spkr,val,diversity)) 
+
     # evalset=[p for p in clus100.keys() if 'evaluation' in p]
     # len(evalset)
     split='train'
@@ -58,9 +63,21 @@ if __name__=="__main__":
                 dist=lv.distance(s1,s2)
                 res[str((label1,label2))]+=dist
             res[str((label1,label2))]/=len(d[split][label2])
+
     
     with (base/f"dist_{ncluster}.json").open('w') as f:
         json.dump(res,f)
-    
+
+    diversity = {}
+    for i in range(len(labels)):
+        label=labels[i]
+        divs = [x[-1] for x in d[split][label]]
+        diversity[label] = (statistics.mean(divs),statistics.stdev(divs))
+    divs = [x[-1] for label in d[split] for x in d[split][label]]
+    diversity['all'] = (statistics.mean(divs),statistics.stdev(divs))
+    with (base/f"udivesty_{ncluster}.json").open('w') as f:
+        json.dump(diversity,f)
+
     print(res)
+    print(diversity)
     # import readline; print('\n'.join([str(readline.get_history_item(i + 1)) for i in range(readline.get_current_history_length())]))  

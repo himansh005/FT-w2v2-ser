@@ -27,6 +27,7 @@ def main():
     parser.add_argument('--save_top_k', type=int, default=1)
     parser.add_argument('--cpu_torchscript', action='store_true')
     parser.add_argument('--xent_alpha',type=float, default=0.5)
+    parser.add_argument('--use_rnn',type=float, default=False)
     # TODO: allowed combo of miner+losses
     # parser.add_argument('--use_miner',type=bool,default=False)
     # parser.add_argument('--metric_loss_type',type=str, choices=['contrastive','triplet'],default=None)

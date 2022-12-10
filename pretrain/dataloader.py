@@ -121,7 +121,6 @@ class MixedDatasetHuBERT(data.Dataset):
             else:
                 self.datasetbase = list(label['Train'].keys())
         self.dataset = [os.path.join(datadir, x) for x in self.datasetbase]
-        self.processor = Wav2Vec2FeatureExtractor.from_pretrained("facebook/hubert-base-ls960")
 
         if unsupdatadir:
             unsupdatadir = unsupdatadir.rstrip('/')
@@ -150,11 +149,8 @@ class MixedDatasetHuBERT(data.Dataset):
         # import pdb;pdb.set_trace()
         batch = list(map(trunc, batch))
         batch = default_collate(batch)
-        processed = self.processor(batch[0].numpy(),sampling_rate=16000, padding=True, return_tensors="pt").input_values.squeeze()
-        import pdb;pdb.set_trace()
-        batch=[processed,batch[1],batch[2],batch[3]]
-
         return batch
+        
     def __len__(self):
         return len(self.dataset)
 

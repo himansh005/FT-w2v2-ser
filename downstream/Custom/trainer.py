@@ -155,10 +155,10 @@ class DownstreamMetricLearning(LightningModule):
         if self.hp.pretrained_path is not None and self.hp.model_type!='hubert':
             self.model = PretrainedEmoFeatureHead.load_from_checkpoint(self.hp.pretrained_path, strict=False,
                                                                 n_classes=self.dataset.nemos,
-                                                                backend=self.hp.model_type)
+                                                                backend=self.hp.model_type)#,use_rnn=self.hp.use_rnn)
         else:
             self.model = PretrainedEmoFeatureHead(n_classes=self.dataset.nemos,
-                                           backend=self.hp.model_type)
+                                           backend=self.hp.model_type)#,use_rnn=self.hp.use_rnn)
         counter = self.dataset.train_dataset.emos
         weights = torch.tensor(
             [counter[c] for c in self.dataset.emoset]
@@ -175,7 +175,7 @@ class DownstreamMetricLearning(LightningModule):
         assert self.xent_alpha >=0 and self.xent_alpha<=1, "xent_alpha should be in [0,1] interval"
         #TODO allow changing loss and miner type/hparams from args
         self.xent_criterion = nn.CrossEntropyLoss(weight=weights)
-        self.metric_criterion = pml_losses.ContrastiveLoss(pos_margin=1, neg_margin=1)
+        self.metric_criterion = pml_losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
         #TODO miner and allowed combinations
         # self.miner=None
         # self.use_miner=self.hp.use_miner
@@ -229,15 +229,18 @@ class DownstreamMetricLearning(LightningModule):
     def training_step(self, batch, batch_idx):
         feats, length, label, fname  = batch
         reps,pout = self(feats, length)
-        xent_loss=torch.tensor(0,dtype=torch.float32).to(device=reps.device)
-        total_loss=torch.tensor(0,dtype=torch.float32).to(device=reps.device)
-        metric_loss=torch.tensor(0,dtype=torch.float32).to(device=reps.device)
-        if self.xent_alpha<1:
-            metric_loss = self.metric_criterion(reps,label)
-            total_loss += (1-self.xent_alpha)*metric_loss
-        if self.xent_alpha>0:
-            xent_loss = self.xent_criterion(pout, label)
-            total_loss += self.xent_alpha*xent_loss
+        metric_loss = self.metric_criterion(reps,label)
+        xent_loss = self.xent_criterion(pout, label)
+        total_loss = self.xent_alpha*xent_loss+(1-self.xent_alpha)*metric_loss
+        # xent_loss=torch.tensor(0,dtype=torch.float32).to(device=reps.device)
+        # total_loss=torch.tensor(0,dtype=torch.float32).to(device=reps.device)
+        # metric_loss=torch.tensor(0,dtype=torch.float32).to(device=reps.device)
+        # if self.xent_alpha<1:
+        #     metric_loss = self.metric_criterion(reps,label)
+        #     total_loss += (1-self.xent_alpha)*metric_loss
+        # if self.xent_alpha>0:
+        #     xent_loss = self.xent_criterion(pout, label)
+        #     total_loss += self.xent_alpha*xent_loss
         tqdm_dict = {'xent_loss': xent_loss,'metric_loss':metric_loss,'total_train_loss':total_loss}
         self.log_dict(tqdm_dict, on_step=True, on_epoch=True, prog_bar=True)
         return total_loss

@@ -8,6 +8,7 @@ import numpy as np
 import json
 import os
 import argparse
+import pickle
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--num_clusters', type=str, default='8,64,512,4096')
@@ -19,7 +20,7 @@ parser.add_argument('--precision', type=int, choices=[16, 32], default=32)
 parser.add_argument('--sample_ratio', type=float, default=0.2)
 parser.add_argument('--unsupdatadir', type=str, default=None)
 parser.add_argument('--labelpath', type=str, default=None)
-
+parser.add_argument('--layer', type=int, default=-1)
 parser.add_argument('--datadir', type=str, required=True)
 parser.add_argument('--outputdir', type=str, required=True)
 args = parser.parse_args()
@@ -31,11 +32,19 @@ def train_kmeans(x, nmb_clusters, verbose=False):
     #Subsample data
     n_data, d = x.shape
 
+    
     # faiss implementation of k-means
     clus = faiss.Clustering(d, nmb_clusters)
 
     clus.niter = 20
     clus.max_points_per_centroid = 500000
+
+
+    # km = faiss.Kmeans(d,nmb_clusters,niter=20,verbose=True,gpu=True)
+    # km.train(x)
+    # kmeans.centroids #np array
+    # _,I = km.index.search(x) #need reshape (2035817, 1), og vectors are (2035817, 768)
+
     res = faiss.StandardGpuResources()
     flat_config = faiss.GpuIndexFlatConfig()
     flat_config.useFloat16 = False
@@ -67,7 +76,7 @@ else:
 model.to(device)
 model.freeze()
 model.eval()
-reps = []
+
 nclusters = [int(x) for x in args.num_clusters.split(',')]
 
 # First Round Sampling data for k-means cluster estimation
@@ -86,11 +95,11 @@ for batch in tqdm(kmeans_dataloader):
     batch = batch[0].to(device)
     if args.precision == 16:
         with torch.cuda.amp.autocast():
-            representation = model(batch)[0]
+            representation,avg_rep = model(batch,layer=args.layer)#[0]
     else:
-        representation = model(batch)[0]
-    representation = representation.cpu().numpy() #L, C
-    reps.append(representation)
+        representation,avg_rep = model(batch,layer=args.layer)#[0]
+    representation = representation.squeeze(0).cpu().numpy() #L, C
+
     #Subsample
     length = representation.shape[0]
     size = max(int(length * args.sample_ratio), 1)
@@ -99,6 +108,7 @@ for batch in tqdm(kmeans_dataloader):
         break
     sampled_reps[head: head+size] = representation[idx]
     head += size
+
 
 sampled_reps = sampled_reps[:head]
 print (f'{head} examples used in k-means...')
@@ -118,16 +128,24 @@ dataloader = data.DataLoader(_data,
                              drop_last=False,
                              shuffle=False)
 combined_dict = dict()
+names = []
+reps = []
+avg_reps = []
 outputdata = [dict() for _ in nclusters]
 for batch in tqdm(dataloader):
     name = batch[1][0]
+    names.append(name)
+
     batch = batch[0].to(device)
     if args.precision == 16:
         with torch.cuda.amp.autocast():
-            representation = model(batch)[0]
+            representation,avg_rep = model(batch,layer=args.layer)
     else:
-        representation = model(batch)[0]
-    representation = representation.cpu().numpy() #L, C
+        representation,avg_rep = model(batch,layer=args.layer)
+    representation = representation.squeeze(0).cpu().numpy() #L, C
+    avg_rep = avg_rep.squeeze(0).cpu().numpy()
+    reps.append(representation)
+    avg_reps.append(avg_rep)
     combined_dict[name] = []
     for i, index in enumerate(kmeans_index):
         indicies = eval_kmeans(representation, index)
@@ -140,3 +158,13 @@ for i, nclus in enumerate(nclusters):
 
 with open(os.path.join(args.outputdir, 'all-clus.json'), 'w') as f:
     json.dump(combined_dict, f, indent=4)
+#dump names & reps zip
+rep_dics={}
+avg_repdics = {}
+for name,rep,avg_rep in zip(names,reps,avg_reps):
+    rep_dics[name]=rep #.append({'name':name,'rep':rep})
+    avg_repdics[name]=avg_rep #.append({'name':name,'avgrep':avg_rep})
+with open(os.path.join(args.outputdir, 'avg_reps_dic.pkl'), 'wb') as f:
+    pickle.dump(avg_repdics,f)
+with open(os.path.join(args.outputdir, f'all_reps_dic.pkl'), 'wb') as f:
+    pickle.dump(rep_dics,f)
