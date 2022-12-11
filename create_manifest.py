@@ -134,4 +134,4 @@ if __name__=="__main__":
         tag=args.tag+'_spkr'
     else:
         tag=args.tag
-    save(args.outdir/tag/f'hubert_{configs}', od["train"], od["evaluation"], od["test"])
+    # save(args.outdir/tag/f'hubert_{configs}', od["train"], od["evaluation"], od["test"])
