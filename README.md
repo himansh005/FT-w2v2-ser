@@ -5,6 +5,9 @@ Codebase for 11-785 Course Project adapted from the official implementation for 
 This is only half the repo necessary to run the entire pipeline. For the vocoder stage, please refer to the Vocoder Repo below.
 
 ## Running the pipeline
+
+Added a sample run notebook in the `ESDDataset.ipynb`.
+
 ### Installation
 The absolute essential packages are placed in `essential_reqs.txt`, we also provide a conda env setup `custom_env_psc` but it's only tested on psc.
 ### Preprocessing
